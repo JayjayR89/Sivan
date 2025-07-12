@@ -18,7 +18,7 @@
             justify-content: center;
             align-items: center;
             box-sizing: border-box;
-            font-size: 0.95rem; /* Slightly smaller base font for better mobile fit */
+            font-size: 0.95rem;
         }
 
         .container {
@@ -30,7 +30,7 @@
             width: 100%;
             display: flex;
             flex-direction: column;
-            gap: 15px; /* Space between main sections */
+            gap: 15px;
         }
 
         .app-header {
@@ -44,7 +44,7 @@
 
         .app-header h5 {
             margin-bottom: 0;
-            flex-grow: 1; /* Allow title to take available space */
+            flex-grow: 1;
             text-align: center;
         }
 
@@ -52,16 +52,16 @@
             font-size: 0.85em;
             color: #6c757d;
             margin: 0 10px;
-            flex-shrink: 0; /* Prevent status from shrinking too much */
+            flex-shrink: 0;
         }
 
         video {
             width: 100%;
             height: auto;
-            max-height: 360px; /* Limit max height for video */
+            max-height: 360px;
             border-radius: 5px;
             background-color: #000;
-            display: none; /* Hidden until started */
+            display: none;
             margin-bottom: 10px;
         }
 
@@ -76,12 +76,8 @@
         }
 
         @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-            100% {
-                transform: rotate(360deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         #statusMessage {
@@ -103,7 +99,7 @@
             overflow-y: auto;
             border: 1px solid #dee2e6;
             display: none;
-            font-size: 0.875rem; /* Smaller font for response */
+            font-size: 0.875rem;
         }
 
         .footer {
@@ -115,7 +111,6 @@
             padding-top: 10px;
         }
 
-        /* Responsive button groups */
         .btn-group-responsive {
             display: flex;
             flex-direction: column;
@@ -123,21 +118,43 @@
         }
 
         .btn-group-responsive .btn {
-            width: 100%; /* Full width on small screens */
+            width: 100%;
         }
 
         @media (min-width: 576px) {
             .btn-group-responsive {
                 flex-direction: row;
-                flex-wrap: wrap; /* Allow wrapping if many buttons */
+                flex-wrap: wrap;
                 justify-content: center;
             }
 
             .btn-group-responsive .btn {
-                flex: 1 1 auto; /* Allow buttons to grow/shrink but maintain min-width */
-                max-width: fit-content; /* Adjust as needed for specific layouts */
-                min-width: 120px; /* Ensure buttons don't get too small */
+                flex: 1 1 auto;
+                max-width: fit-content;
+                min-width: 120px;
             }
+        }
+
+        /* Accessibility improvements */
+        .btn:focus {
+            outline: 2px solid #007bff;
+            outline-offset: 2px;
+        }
+
+        /* Loading state styles */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-weight: 500;
+        }
+
+        .success-message {
+            color: #28a745;
+            font-weight: 500;
         }
     </style>
 </head>
@@ -145,29 +162,41 @@
 <body>
     <div class="container">
         <div class="app-header">
-            <button id="loginLogoutButton" class="btn btn-sm btn-outline-primary">Login</button>
-            <span id="loginStatus" class="status-indicator">Not logged in.</span>
-            <button id="settingsButton" class="btn btn-sm btn-outline-secondary"><i class="fas fa-cog"></i></button>
+            <button id="loginLogoutButton" class="btn btn-sm btn-outline-primary" aria-label="Login or logout">
+                Login
+            </button>
+            <span id="loginStatus" class="status-indicator" role="status" aria-live="polite">Not logged in.</span>
+            <button id="settingsButton" class="btn btn-sm btn-outline-secondary" aria-label="Open settings">
+                <i class="fas fa-cog"></i>
+            </button>
         </div>
 
         <div id="appContent" style="display: none;">
             <div class="camera-preview-box text-center">
-                <video id="camera" autoplay playsinline></video>
-                <canvas id="canvas" style="display: none;"></canvas>
-                <button id="changeCameraButton" class="btn btn-secondary btn-sm mt-2" style="display: none;">
+                <video id="camera" autoplay playsinline aria-label="Camera preview"></video>
+                <canvas id="canvas" style="display: none;" aria-hidden="true"></canvas>
+                <button id="changeCameraButton" class="btn btn-secondary btn-sm mt-2" style="display: none;" aria-label="Switch to different camera">
                     <i class="fas fa-sync-alt"></i> Change Camera
                 </button>
             </div>
 
             <div class="btn-group-responsive control-buttons">
-                <button id="startButton" class="btn btn-info">Start Webcam</button>
-                <button id="stopButton" class="btn btn-warning" disabled>Stop Webcam</button>
-                <button id="captureButton" class="btn btn-success" disabled>Capture Photo</button>
-                <button id="describeButton" class="btn btn-primary" disabled>Describe Photo</button>
+                <button id="startButton" class="btn btn-info" aria-label="Start webcam">
+                    Start Webcam
+                </button>
+                <button id="stopButton" class="btn btn-warning" disabled aria-label="Stop webcam">
+                    Stop Webcam
+                </button>
+                <button id="captureButton" class="btn btn-success" disabled aria-label="Capture photo">
+                    Capture Photo
+                </button>
+                <button id="describeButton" class="btn btn-primary" disabled aria-label="Describe photo with AI">
+                    Describe Photo
+                </button>
             </div>
             
-            <p id="statusMessage" class="text-muted"></p>
-            <div id="aiResponse" class="text-left"></div>
+            <p id="statusMessage" class="text-muted" role="status" aria-live="polite"></p>
+            <div id="aiResponse" class="text-left" role="region" aria-label="AI response"></div>
         </div>
 
         <div class="footer">
@@ -176,7 +205,369 @@
     </div>
 
     <script>
-        // DOM Elements
+        // ===== CONSTANTS AND CONFIGURATION =====
+        const DEBUG_MODE = false;
+        const CACHE_DURATION = 30000; // 30 seconds
+        const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+        const PERFORMANCE_THRESHOLD = 5000; // 5 seconds
+
+        const LoadingStates = {
+            IDLE: 'idle',
+            STARTING_CAMERA: 'starting_camera',
+            CAPTURING: 'capturing',
+            PROCESSING_AI: 'processing_ai'
+        };
+
+        // ===== UTILITY FUNCTIONS =====
+        function debugLog(message, data = null) {
+            if (DEBUG_MODE) {
+                console.log(`[DEBUG] ${message}`, data);
+            }
+        }
+
+        function validateImageBlob(blob) {
+            if (!blob || blob.size === 0) {
+                throw new Error('Invalid image data');
+            }
+            
+            if (blob.size > MAX_IMAGE_SIZE) {
+                throw new Error('Image file too large (max 10MB)');
+            }
+            
+            return true;
+        }
+
+        function getErrorMessage(error) {
+            if (error.name === 'NotAllowedError') {
+                return 'Camera access denied. Please allow camera permissions.';
+            } else if (error.name === 'NotFoundError') {
+                return 'No camera found. Please check your device.';
+            } else if (error.name === 'NetworkError') {
+                return 'Network error. Please check your connection.';
+            } else if (error.name === 'NotSupportedError') {
+                return 'Camera not supported on this device.';
+            } else if (error.name === 'AbortError') {
+                return 'Operation was cancelled.';
+            }
+            return `Error: ${error.message}`;
+        }
+
+        // ===== PERFORMANCE MONITORING =====
+        class PerformanceMonitor {
+            constructor() {
+                this.metrics = {
+                    captureTime: [],
+                    aiResponseTime: [],
+                    memoryUsage: []
+                };
+            }
+            
+            startTimer(operation) {
+                return performance.now();
+            }
+            
+            endTimer(startTime, operation) {
+                const duration = performance.now() - startTime;
+                this.metrics[operation].push(duration);
+                
+                if (duration > PERFORMANCE_THRESHOLD) {
+                    console.warn(`Slow ${operation}: ${duration}ms`);
+                }
+                
+                debugLog(`${operation} completed in ${duration}ms`);
+                return duration;
+            }
+            
+            getAverageTime(operation) {
+                const times = this.metrics[operation];
+                if (times.length === 0) return 0;
+                return times.reduce((a, b) => a + b, 0) / times.length;
+            }
+        }
+
+        const performanceMonitor = new PerformanceMonitor();
+
+        // ===== FILE MANAGEMENT =====
+        class FileManager {
+            constructor() {
+                this.temporaryFiles = new Set();
+            }
+            
+            async saveTemporaryFile(blob, filename) {
+                try {
+                    validateImageBlob(blob);
+                    const puterFile = await puter.fs.write(filename, blob);
+                    this.temporaryFiles.add(puterFile.path);
+                    debugLog('Temporary file saved', { path: puterFile.path, size: blob.size });
+                    return puterFile;
+                } catch (error) {
+                    throw new Error(`Failed to save file: ${error.message}`);
+                }
+            }
+            
+            async cleanupTemporaryFiles() {
+                const cleanupPromises = Array.from(this.temporaryFiles).map(async (path) => {
+                    try {
+                        await puter.fs.delete(path);
+                        this.temporaryFiles.delete(path);
+                        debugLog('Temporary file deleted', { path });
+                    } catch (error) {
+                        console.error(`Failed to delete temporary file ${path}:`, error);
+                    }
+                });
+                
+                await Promise.allSettled(cleanupPromises);
+            }
+            
+            async cleanupSpecificFile(path) {
+                if (this.temporaryFiles.has(path)) {
+                    try {
+                        await puter.fs.delete(path);
+                        this.temporaryFiles.delete(path);
+                        debugLog('Specific temporary file deleted', { path });
+                    } catch (error) {
+                        console.error(`Failed to delete file ${path}:`, error);
+                    }
+                }
+            }
+        }
+
+        const fileManager = new FileManager();
+
+        // ===== CAMERA MANAGEMENT =====
+        class CameraManager {
+            constructor() {
+                this.currentStream = null;
+                this.videoDevices = [];
+                this.currentDeviceIndex = 0;
+                this.deviceCache = null;
+                this.deviceCacheExpiry = 0;
+            }
+            
+            isValidStream(stream) {
+                return stream && stream.active && stream.getTracks().length > 0;
+            }
+            
+            async getAvailableVideoDevices() {
+                const now = Date.now();
+                
+                if (this.deviceCache && now < this.deviceCacheExpiry) {
+                    return this.deviceCache;
+                }
+                
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    this.videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    this.deviceCache = this.videoDevices;
+                    this.deviceCacheExpiry = now + CACHE_DURATION;
+                    debugLog('Video devices enumerated', { count: this.videoDevices.length });
+                    return this.videoDevices;
+                } catch (error) {
+                    handleError(error, 'device_enumeration');
+                    return [];
+                }
+            }
+            
+            async startWebcam() {
+                if (this.isValidStream(this.currentStream)) {
+                    this.stopWebcam();
+                }
+
+                const startTime = performanceMonitor.startTimer('webcam_start');
+                statusMessage.textContent = 'Requesting webcam access...';
+                
+                try {
+                    await this.getAvailableVideoDevices();
+
+                    if (this.videoDevices.length === 0) {
+                        throw new Error('No camera devices found.');
+                    }
+
+                    const constraints = {
+                        video: {
+                            deviceId: this.videoDevices[this.currentDeviceIndex] ? 
+                                { exact: this.videoDevices[this.currentDeviceIndex].deviceId } : 
+                                undefined
+                        },
+                        audio: false
+                    };
+
+                    this.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    video.srcObject = this.currentStream;
+                    video.style.display = 'block';
+                    
+                    uiManager.updateButtonStates(LoadingStates.IDLE);
+                    statusMessage.textContent = `Webcam active (Device: ${this.videoDevices[this.currentDeviceIndex]?.label || 'Default'}). Ready to capture.`;
+                    uiManager.hideSpinner();
+                    aiResponseDiv.textContent = '';
+                    lastCapturedFilePuterPath = null;
+                    
+                    performanceMonitor.endTimer(startTime, 'webcam_start');
+                    debugLog('Webcam started successfully', { deviceIndex: this.currentDeviceIndex });
+
+                } catch (err) {
+                    performanceMonitor.endTimer(startTime, 'webcam_start');
+                    handleError(err, 'webcam');
+                }
+            }
+            
+            stopWebcam() {
+                if (this.currentStream) {
+                    this.currentStream.getTracks().forEach(track => track.stop());
+                    video.srcObject = null;
+                    video.style.display = 'none';
+                    this.currentStream = null;
+                    statusMessage.textContent = 'Webcam stopped.';
+                    debugLog('Webcam stopped');
+                }
+                uiManager.resetUIState();
+                lastCapturedFilePuterPath = null;
+                uiManager.hideSpinner();
+                aiResponseDiv.textContent = '';
+            }
+            
+            async changeCamera() {
+                this.currentDeviceIndex = (this.currentDeviceIndex + 1) % this.videoDevices.length;
+                await this.startWebcam();
+            }
+            
+            cleanup() {
+                this.stopWebcam();
+                fileManager.cleanupTemporaryFiles();
+            }
+        }
+
+        // ===== UI MANAGEMENT =====
+        class UIManager {
+            constructor() {
+                this.currentLoadingState = LoadingStates.IDLE;
+            }
+            
+            setLoadingState(state) {
+                this.currentLoadingState = state;
+                this.updateUIForLoadingState();
+            }
+            
+            updateUIForLoadingState() {
+                const buttons = [startButton, stopButton, captureButton, describeButton, changeCameraButton];
+                
+                buttons.forEach(button => {
+                    button.disabled = this.currentLoadingState !== LoadingStates.IDLE;
+                });
+                
+                const statusMessages = {
+                    [LoadingStates.STARTING_CAMERA]: 'Starting camera...',
+                    [LoadingStates.CAPTURING]: 'Capturing photo...',
+                    [LoadingStates.PROCESSING_AI]: 'AI is analyzing image...'
+                };
+                
+                statusMessage.textContent = statusMessages[this.currentLoadingState] || '';
+            }
+            
+            updateButtonStates(state) {
+                switch (state) {
+                    case LoadingStates.IDLE:
+                        startButton.disabled = false;
+                        stopButton.disabled = true;
+                        captureButton.disabled = true;
+                        describeButton.disabled = true;
+                        changeCameraButton.disabled = false;
+                        break;
+                    case LoadingStates.STARTING_CAMERA:
+                        startButton.disabled = true;
+                        stopButton.disabled = true;
+                        captureButton.disabled = true;
+                        describeButton.disabled = true;
+                        changeCameraButton.disabled = true;
+                        break;
+                    case 'camera_active':
+                        startButton.disabled = true;
+                        stopButton.disabled = false;
+                        captureButton.disabled = false;
+                        describeButton.disabled = true;
+                        changeCameraButton.disabled = false;
+                        break;
+                    case 'photo_captured':
+                        startButton.disabled = true;
+                        stopButton.disabled = false;
+                        captureButton.disabled = false;
+                        describeButton.disabled = false;
+                        changeCameraButton.disabled = false;
+                        break;
+                }
+            }
+            
+            resetUIState() {
+                this.updateButtonStates(LoadingStates.IDLE);
+            }
+            
+            showSpinner(message = 'Processing...') {
+                aiResponseDiv.style.display = 'block';
+                aiResponseDiv.innerHTML = `<div class="spinner"></div><p class="text-center mt-3">${message}</p>`;
+            }
+            
+            hideSpinner() {
+                aiResponseDiv.innerHTML = '';
+                aiResponseDiv.style.display = 'none';
+            }
+            
+            showError(message) {
+                statusMessage.textContent = message;
+                statusMessage.className = 'text-muted error-message';
+            }
+            
+            showSuccess(message) {
+                statusMessage.textContent = message;
+                statusMessage.className = 'text-muted success-message';
+            }
+            
+            clearStatus() {
+                statusMessage.className = 'text-muted';
+            }
+        }
+
+        // ===== AI SERVICE =====
+        class AIService {
+            async describeImage(imagePath) {
+                const startTime = performanceMonitor.startTimer('ai_response');
+                
+                try {
+                    const prompt = 'Please describe this image in detail, providing key objects, actions, and overall context.';
+                    const aiResponse = await puter.ai.chat(
+                        prompt, 
+                        imagePath,
+                        { stream: true }
+                    );
+
+                    aiResponseDiv.textContent = '';
+                    for await (const part of aiResponse) {
+                        if (part?.text) {
+                            aiResponseDiv.textContent += part.text;
+                            aiResponseDiv.scrollTop = aiResponseDiv.scrollHeight;
+                        }
+                    }
+                    
+                    performanceMonitor.endTimer(startTime, 'ai_response');
+                    return true;
+                } catch (error) {
+                    performanceMonitor.endTimer(startTime, 'ai_response');
+                    throw error;
+                }
+            }
+        }
+
+        // ===== ERROR HANDLING =====
+        function handleError(error, context) {
+            console.error(`Error in ${context}:`, error);
+            const userMessage = getErrorMessage(error);
+            uiManager.showError(userMessage);
+            
+            if (context === 'webcam' || context === 'ai') {
+                uiManager.resetUIState();
+            }
+        }
+
+        // ===== DOM ELEMENTS =====
         const loginLogoutButton = document.getElementById('loginLogoutButton');
         const loginStatusSpan = document.getElementById('loginStatus');
         const settingsButton = document.getElementById('settingsButton');
@@ -192,24 +583,20 @@
         const statusMessage = document.getElementById('statusMessage');
         const aiResponseDiv = document.getElementById('aiResponse');
 
-        // State Variables
-        let currentStream = null;
+        // ===== STATE VARIABLES =====
         let lastCapturedFilePuterPath = null;
-        let videoDevices = [];
-        let currentDeviceIndex = 0;
 
-        // --- UI Utility Functions ---
-        function showSpinner(message = 'Processing...') {
-            aiResponseDiv.style.display = 'block';
-            aiResponseDiv.innerHTML = `<div class="spinner"></div><p class="text-center mt-3">${message}</p>`;
+        // ===== INSTANCES =====
+        const cameraManager = new CameraManager();
+        const uiManager = new UIManager();
+        const aiService = new AIService();
+
+        // ===== CANVAS UTILITIES =====
+        function cleanupCanvas() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
         }
 
-        function hideSpinner() {
-            aiResponseDiv.innerHTML = '';
-            aiResponseDiv.style.display = 'none';
-        }
-
-        // --- Authentication Logic ---
+        // ===== AUTHENTICATION LOGIC =====
         async function updateLoginUI() {
             const isSignedIn = await puter.auth.isSignedIn();
             if (isSignedIn) {
@@ -217,36 +604,35 @@
                 loginStatusSpan.textContent = `Logged in as ${user.username}.`;
                 loginLogoutButton.textContent = 'Logout';
                 loginLogoutButton.classList.remove('btn-outline-primary');
-                loginLogoutButton.classList.add('btn-danger'); // Logout button style
+                loginLogoutButton.classList.add('btn-danger');
                 appContent.style.display = 'flex';
                 statusMessage.textContent = 'Welcome! Start webcam to begin.';
+                debugLog('User logged in', { username: user.username });
             } else {
                 loginStatusSpan.textContent = 'Not logged in.';
                 loginLogoutButton.textContent = 'Login';
                 loginLogoutButton.classList.remove('btn-danger');
-                loginLogoutButton.classList.add('btn-outline-primary'); // Login button style
+                loginLogoutButton.classList.add('btn-outline-primary');
                 appContent.style.display = 'none';
                 statusMessage.textContent = 'Please log in to use the app features.';
-                stopWebcam(); // Ensure webcam is off if logged out
+                cameraManager.stopWebcam();
+                debugLog('User logged out');
             }
         }
 
         async function handleLoginLogout() {
             if (await puter.auth.isSignedIn()) {
-                // User is logged in, so log out
                 statusMessage.textContent = 'Logging out...';
                 await puter.auth.signOut();
                 statusMessage.textContent = 'Logged out.';
             } else {
-                // User is not logged in, so initiate login
                 statusMessage.textContent = 'Opening login dialog...';
                 await puter.auth.signIn();
             }
-            // Always update UI after authentication action
             await updateLoginUI();
         }
 
-        // --- Settings Popup ---
+        // ===== SETTINGS POPUP =====
         async function showSettings() {
             await puter.ui.createWindow({
                 title: 'App Settings',
@@ -260,221 +646,135 @@
                 has_head: true,
                 center: true,
                 show_in_taskbar: false,
-                disable_parent_window: true // Block main window while settings are open
+                disable_parent_window: true
             });
         }
 
-        // --- Webcam Control Logic ---
-        async function getAvailableVideoDevices() {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                videoDevices = devices.filter(device => device.kind === 'videoinput');
-                if (videoDevices.length > 1) {
-                    changeCameraButton.style.display = 'block';
-                } else {
-                    changeCameraButton.style.display = 'none';
-                }
-            } catch (err) {
-                console.error("Error enumerating devices:", err);
-                statusMessage.textContent = `Error enumerating cameras: ${err.message}`;
-                changeCameraButton.style.display = 'none';
-            }
-        }
-
-        async function startWebcam() {
-            if (currentStream) {
-                stopWebcam(); // Stop any existing stream before starting a new one
-            }
-
-            statusMessage.textContent = 'Requesting webcam access...';
-            try {
-                // Ensure devices are enumerated before selecting one
-                await getAvailableVideoDevices();
-
-                if (videoDevices.length === 0) {
-                    statusMessage.textContent = 'No camera devices found.';
-                    return;
-                }
-
-                const constraints = {
-                    video: {
-                        deviceId: videoDevices[currentDeviceIndex] ? { exact: videoDevices[currentDeviceIndex].deviceId } : undefined
-                    },
-                    audio: false
-                };
-
-                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = currentStream;
-                video.style.display = 'block';
-                
-                startButton.disabled = true;
-                stopButton.disabled = false;
-                captureButton.disabled = false;
-                describeButton.disabled = true; // Describe button only enabled after capture
-                
-                statusMessage.textContent = `Webcam active (Device: ${videoDevices[currentDeviceIndex]?.label || 'Default'}). Ready to capture.`;
-                hideSpinner(); // Hide any pending spinner/AI response
-                aiResponseDiv.textContent = '';
-                lastCapturedFilePuterPath = null;
-
-            } catch (err) {
-                statusMessage.textContent = `Error accessing webcam: ${err.message}. Please allow camera permissions.`;
-                console.error("Error accessing webcam:", err);
-                startButton.disabled = false;
-                stopButton.disabled = true;
-                captureButton.disabled = true;
-                describeButton.disabled = true;
-                video.style.display = 'none';
-                changeCameraButton.style.display = 'none';
-            }
-        }
-
-        function stopWebcam() {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-                video.srcObject = null;
-                video.style.display = 'none';
-                currentStream = null;
-                statusMessage.textContent = 'Webcam stopped.';
-            }
-            startButton.disabled = false;
-            stopButton.disabled = true;
-            captureButton.disabled = true;
-            describeButton.disabled = true;
-            lastCapturedFilePuterPath = null;
-            hideSpinner();
-            aiResponseDiv.textContent = '';
-        }
-
-        async function changeCamera() {
-            currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
-            await startWebcam(); // Restart webcam with the next device
-        }
-
-        // --- Capture and AI Description Logic ---
+        // ===== CAPTURE AND AI LOGIC =====
         async function capturePhoto() {
-            if (!currentStream) {
-                statusMessage.textContent = 'Webcam not started. Please start webcam first.';
+            if (!cameraManager.isValidStream(cameraManager.currentStream)) {
+                uiManager.showError('Webcam not started. Please start webcam first.');
                 return;
             }
 
-            captureButton.disabled = true;
-            describeButton.disabled = true;
-            stopButton.disabled = true; // Disable stop during capture
-            startButton.disabled = true; // Disable start during capture
-            changeCameraButton.disabled = true; // Disable camera change
-
-            statusMessage.textContent = 'Capturing image...';
-            hideSpinner(); // Clear previous AI results
+            uiManager.setLoadingState(LoadingStates.CAPTURING);
+            uiManager.hideSpinner();
             aiResponseDiv.textContent = '';
-            lastCapturedFilePuterPath = null; // Reset path for new capture
+            lastCapturedFilePuterPath = null;
 
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const startTime = performanceMonitor.startTimer('capture');
 
-            canvas.toBlob(async (blob) => {
-                if (blob) {
+            try {
+                if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                }
+
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                canvas.toBlob(async (blob) => {
                     try {
+                        validateImageBlob(blob);
                         const filename = `webcam_snapshot_${Date.now()}.png`;
-                        const puterFile = await puter.fs.write(filename, blob);
+                        const puterFile = await fileManager.saveTemporaryFile(blob, filename);
                         lastCapturedFilePuterPath = puterFile.path;
                         
-                        statusMessage.innerHTML = `✅ Photo captured and saved to Puter: <code>${puterFile.path}</code>. Ready for description.`;
-                        describeButton.disabled = false; // Enable describe button
+                        uiManager.showSuccess(`✅ Photo captured and saved. Ready for description.`);
+                        uiManager.updateButtonStates('photo_captured');
+                        performanceMonitor.endTimer(startTime, 'capture');
                         
                     } catch (error) {
-                        console.error('Error saving photo to Puter:', error);
-                        statusMessage.textContent = 'Error saving photo: ' + error.message;
+                        handleError(error, 'capture');
+                        performanceMonitor.endTimer(startTime, 'capture');
+                    } finally {
+                        cleanupCanvas();
+                        uiManager.setLoadingState(LoadingStates.IDLE);
                     }
-                } else {
-                    statusMessage.textContent = 'Failed to create image blob from canvas.';
-                }
-                captureButton.disabled = false;
-                stopButton.disabled = false;
-                // startButton remains disabled until stop webcam
-                changeCameraButton.disabled = false;
-            }, 'image/png');
+                }, 'image/png');
+
+            } catch (error) {
+                handleError(error, 'capture');
+                performanceMonitor.endTimer(startTime, 'capture');
+                uiManager.setLoadingState(LoadingStates.IDLE);
+            }
         }
 
         async function describePhotoWithAI() {
             if (!lastCapturedFilePuterPath) {
-                statusMessage.textContent = 'No photo has been captured yet to describe.';
+                uiManager.showError('No photo has been captured yet to describe.');
                 return;
             }
 
-            describeButton.disabled = true;
-            captureButton.disabled = true; // Disable capture during AI processing
-            startButton.disabled = true;
-            stopButton.disabled = true;
-            changeCameraButton.disabled = true;
-
-            statusMessage.textContent = 'Sending photo to AI for description...';
-            showSpinner('AI is analyzing the image...');
+            uiManager.setLoadingState(LoadingStates.PROCESSING_AI);
+            uiManager.showSpinner('AI is analyzing the image...');
 
             try {
-                const prompt = 'Please describe this image in detail, providing key objects, actions, and overall context.';
-                // puter.ai.chat expects a Puter path or URL for image context
-                const aiResponse = await puter.ai.chat(
-                    prompt, 
-                    lastCapturedFilePuterPath,
-                    { stream: true } // Stream the response for better user experience
-                );
+                await aiService.describeImage(lastCapturedFilePuterPath);
+                uiManager.showSuccess('AI description complete.');
 
-                aiResponseDiv.textContent = ''; // Clear spinner content
-                for await (const part of aiResponse) {
-                    if (part?.text) {
-                        aiResponseDiv.textContent += part.text;
-                        aiResponseDiv.scrollTop = aiResponseDiv.scrollHeight; // Scroll to bottom as content arrives
-                    }
-                }
-                statusMessage.textContent = 'AI description complete.';
-
-                // Optional: Clean up the temporary file after AI description
-                await puter.fs.delete(lastCapturedFilePuterPath);
-                statusMessage.innerHTML += '<br>Temporary file deleted from Puter. (Path: ' + lastCapturedFilePuterPath + ')';
-                lastCapturedFilePuterPath = null; // Clear path after deletion
+                // Clean up the temporary file after AI description
+                await fileManager.cleanupSpecificFile(lastCapturedFilePuterPath);
+                lastCapturedFilePuterPath = null;
 
             } catch (error) {
-                console.error('Error describing image with AI:', error);
+                handleError(error, 'ai');
                 aiResponseDiv.textContent = 'Error getting AI description: ' + error.message;
-                statusMessage.textContent = 'AI description failed.';
             } finally {
-                hideSpinner();
-                describeButton.disabled = false;
-                captureButton.disabled = false;
-                startButton.disabled = true; // Still disabled if stream is active
-                stopButton.disabled = false;
-                changeCameraButton.disabled = false;
+                uiManager.hideSpinner();
+                uiManager.setLoadingState(LoadingStates.IDLE);
             }
         }
 
-        // --- App Lifecycle and Event Listeners ---
-        // Initialize by checking login status on page load
-        updateLoginUI();
+        // ===== EVENT HANDLERS =====
+        async function handleStartWebcam() {
+            uiManager.setLoadingState(LoadingStates.STARTING_CAMERA);
+            await cameraManager.startWebcam();
+        }
 
-        // Event Listeners
-        loginLogoutButton.addEventListener('click', handleLoginLogout);
-        settingsButton.addEventListener('click', showSettings);
-        startButton.addEventListener('click', startWebcam);
-        stopButton.addEventListener('click', stopWebcam);
-        captureButton.addEventListener('click', capturePhoto);
-        describeButton.addEventListener('click', describePhotoWithAI);
-        changeCameraButton.addEventListener('click', changeCamera);
+        function handleStopWebcam() {
+            cameraManager.stopWebcam();
+        }
 
-        // Cleanup webcam stream when the app window closes
-        puter.ui.onWindowClose(function() {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-                console.log("Webcam stream stopped on app close.");
-            }
-            // If there's a temporary file, try to delete it on close
-            if (lastCapturedFilePuterPath) {
-                puter.fs.delete(lastCapturedFilePuterPath)
-                    .then(() => console.log("Cleaned up temporary file on app close."))
-                    .catch(e => console.error("Error cleaning up temporary file on app close:", e));
+        async function handleChangeCamera() {
+            uiManager.setLoadingState(LoadingStates.STARTING_CAMERA);
+            await cameraManager.changeCamera();
+        }
+
+        // ===== KEYBOARD NAVIGATION =====
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && document.activeElement === captureButton) {
+                capturePhoto();
+            } else if (event.key === 'Escape' && cameraManager.isValidStream(cameraManager.currentStream)) {
+                handleStopWebcam();
             }
         });
+
+        // ===== INITIALIZATION =====
+        updateLoginUI();
+
+        // ===== EVENT LISTENERS =====
+        loginLogoutButton.addEventListener('click', handleLoginLogout);
+        settingsButton.addEventListener('click', showSettings);
+        startButton.addEventListener('click', handleStartWebcam);
+        stopButton.addEventListener('click', handleStopWebcam);
+        captureButton.addEventListener('click', capturePhoto);
+        describeButton.addEventListener('click', describePhotoWithAI);
+        changeCameraButton.addEventListener('click', handleChangeCamera);
+
+        // ===== CLEANUP ON WINDOW CLOSE =====
+        puter.ui.onWindowClose(function() {
+            cameraManager.cleanup();
+            debugLog('App cleanup completed on window close');
+        });
+
+        // ===== PERFORMANCE MONITORING LOGGING =====
+        if (DEBUG_MODE) {
+            setInterval(() => {
+                const avgCaptureTime = performanceMonitor.getAverageTime('captureTime');
+                const avgAiTime = performanceMonitor.getAverageTime('aiResponseTime');
+                debugLog('Performance metrics', { avgCaptureTime, avgAiTime });
+            }, 30000); // Log every 30 seconds in debug mode
+        }
     </script>
 </body>
 
