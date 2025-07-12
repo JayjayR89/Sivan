@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puter Camera AI</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://js.puter.com/v2/"></script>
+    <style>
+        body {
+            padding: 10px;
+            background-color: #f8f9fa;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+            font-size: 0.95rem; /* Slightly smaller base font for better mobile fit */
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 15px; /* Space between main sections */
+        }
+
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 15px;
+        }
+
+        .app-header h5 {
+            margin-bottom: 0;
+            flex-grow: 1; /* Allow title to take available space */
+            text-align: center;
+        }
+
+        .app-header .status-indicator {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin: 0 10px;
+            flex-shrink: 0; /* Prevent status from shrinking too much */
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            max-height: 360px; /* Limit max height for video */
+            border-radius: 5px;
+            background-color: #000;
+            display: none; /* Hidden until started */
+            margin-bottom: 10px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #007bff;
+            animation: spin 1s ease infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #statusMessage {
+            font-size: 0.9em;
+            color: #555;
+            margin-top: 5px;
+            text-align: center;
+        }
+
+        #aiResponse {
+            margin-top: 10px;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            text-align: left;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            display: none;
+            font-size: 0.875rem; /* Smaller font for response */
+        }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #6c757d;
+            text-align: center;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+
+        /* Responsive button groups */
+        .btn-group-responsive {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn-group-responsive .btn {
+            width: 100%; /* Full width on small screens */
+        }
+
+        @media (min-width: 576px) {
+            .btn-group-responsive {
+                flex-direction: row;
+                flex-wrap: wrap; /* Allow wrapping if many buttons */
+                justify-content: center;
+            }
+
+            .btn-group-responsive .btn {
+                flex: 1 1 auto; /* Allow buttons to grow/shrink but maintain min-width */
+                max-width: fit-content; /* Adjust as needed for specific layouts */
+                min-width: 120px; /* Ensure buttons don't get too small */
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="app-header">
+            <button id="loginLogoutButton" class="btn btn-sm btn-outline-primary">Login</button>
+            <span id="loginStatus" class="status-indicator">Not logged in.</span>
+            <button id="settingsButton" class="btn btn-sm btn-outline-secondary"><i class="fas fa-cog"></i></button>
+        </div>
+
+        <div id="appContent" style="display: none;">
+            <div class="camera-preview-box text-center">
+                <video id="camera" autoplay playsinline></video>
+                <canvas id="canvas" style="display: none;"></canvas>
+                <button id="changeCameraButton" class="btn btn-secondary btn-sm mt-2" style="display: none;">
+                    <i class="fas fa-sync-alt"></i> Change Camera
+                </button>
+            </div>
+
+            <div class="btn-group-responsive control-buttons">
+                <button id="startButton" class="btn btn-info">Start Webcam</button>
+                <button id="stopButton" class="btn btn-warning" disabled>Stop Webcam</button>
+                <button id="captureButton" class="btn btn-success" disabled>Capture Photo</button>
+                <button id="describeButton" class="btn btn-primary" disabled>Describe Photo</button>
+            </div>
+            
+            <p id="statusMessage" class="text-muted"></p>
+            <div id="aiResponse" class="text-left"></div>
+        </div>
+
+        <div class="footer">
+            <a href="https://developer.puter.com" target="_blank">Powered by Puter</a>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const loginLogoutButton = document.getElementById('loginLogoutButton');
+        const loginStatusSpan = document.getElementById('loginStatus');
+        const settingsButton = document.getElementById('settingsButton');
+        const appContent = document.getElementById('appContent');
+        const video = document.getElementById('camera');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const captureButton = document.getElementById('captureButton');
+        const describeButton = document.getElementById('describeButton');
+        const changeCameraButton = document.getElementById('changeCameraButton');
+        const statusMessage = document.getElementById('statusMessage');
+        const aiResponseDiv = document.getElementById('aiResponse');
+
+        // State Variables
+        let currentStream = null;
+        let lastCapturedFilePuterPath = null;
+        let videoDevices = [];
+        let currentDeviceIndex = 0;
+
+        // --- UI Utility Functions ---
+        function showSpinner(message = 'Processing...') {
+            aiResponseDiv.style.display = 'block';
+            aiResponseDiv.innerHTML = `<div class="spinner"></div><p class="text-center mt-3">${message}</p>`;
+        }
+
+        function hideSpinner() {
+            aiResponseDiv.innerHTML = '';
+            aiResponseDiv.style.display = 'none';
+        }
+
+        // --- Authentication Logic ---
+        async function updateLoginUI() {
+            const isSignedIn = await puter.auth.isSignedIn();
+            if (isSignedIn) {
+                const user = await puter.auth.getUser();
+                loginStatusSpan.textContent = `Logged in as ${user.username}.`;
+                loginLogoutButton.textContent = 'Logout';
+                loginLogoutButton.classList.remove('btn-outline-primary');
+                loginLogoutButton.classList.add('btn-danger'); // Logout button style
+                appContent.style.display = 'flex';
+                statusMessage.textContent = 'Welcome! Start webcam to begin.';
+            } else {
+                loginStatusSpan.textContent = 'Not logged in.';
+                loginLogoutButton.textContent = 'Login';
+                loginLogoutButton.classList.remove('btn-danger');
+                loginLogoutButton.classList.add('btn-outline-primary'); // Login button style
+                appContent.style.display = 'none';
+                statusMessage.textContent = 'Please log in to use the app features.';
+                stopWebcam(); // Ensure webcam is off if logged out
+            }
+        }
+
+        async function handleLoginLogout() {
+            if (await puter.auth.isSignedIn()) {
+                // User is logged in, so log out
+                statusMessage.textContent = 'Logging out...';
+                await puter.auth.signOut();
+                statusMessage.textContent = 'Logged out.';
+            } else {
+                // User is not logged in, so initiate login
+                statusMessage.textContent = 'Opening login dialog...';
+                await puter.auth.signIn();
+            }
+            // Always update UI after authentication action
+            await updateLoginUI();
+        }
+
+        // --- Settings Popup ---
+        async function showSettings() {
+            await puter.ui.createWindow({
+                title: 'App Settings',
+                content: `<div style="padding: 20px; text-align: center;">
+                            <p>Settings coming soon!</p>
+                            <p>This is a placeholder for future configurations like AI model selection, etc.</p>
+                          </div>`,
+                width: 400,
+                height: 250,
+                is_resizable: false,
+                has_head: true,
+                center: true,
+                show_in_taskbar: false,
+                disable_parent_window: true // Block main window while settings are open
+            });
+        }
+
+        // --- Webcam Control Logic ---
+        async function getAvailableVideoDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                videoDevices = devices.filter(device => device.kind === 'videoinput');
+                if (videoDevices.length > 1) {
+                    changeCameraButton.style.display = 'block';
+                } else {
+                    changeCameraButton.style.display = 'none';
+                }
+            } catch (err) {
+                console.error("Error enumerating devices:", err);
+                statusMessage.textContent = `Error enumerating cameras: ${err.message}`;
+                changeCameraButton.style.display = 'none';
+            }
+        }
+
+        async function startWebcam() {
+            if (currentStream) {
+                stopWebcam(); // Stop any existing stream before starting a new one
+            }
+
+            statusMessage.textContent = 'Requesting webcam access...';
+            try {
+                // Ensure devices are enumerated before selecting one
+                await getAvailableVideoDevices();
+
+                if (videoDevices.length === 0) {
+                    statusMessage.textContent = 'No camera devices found.';
+                    return;
+                }
+
+                const constraints = {
+                    video: {
+                        deviceId: videoDevices[currentDeviceIndex] ? { exact: videoDevices[currentDeviceIndex].deviceId } : undefined
+                    },
+                    audio: false
+                };
+
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = currentStream;
+                video.style.display = 'block';
+                
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                captureButton.disabled = false;
+                describeButton.disabled = true; // Describe button only enabled after capture
+                
+                statusMessage.textContent = `Webcam active (Device: ${videoDevices[currentDeviceIndex]?.label || 'Default'}). Ready to capture.`;
+                hideSpinner(); // Hide any pending spinner/AI response
+                aiResponseDiv.textContent = '';
+                lastCapturedFilePuterPath = null;
+
+            } catch (err) {
+                statusMessage.textContent = `Error accessing webcam: ${err.message}. Please allow camera permissions.`;
+                console.error("Error accessing webcam:", err);
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                captureButton.disabled = true;
+                describeButton.disabled = true;
+                video.style.display = 'none';
+                changeCameraButton.style.display = 'none';
+            }
+        }
+
+        function stopWebcam() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                video.style.display = 'none';
+                currentStream = null;
+                statusMessage.textContent = 'Webcam stopped.';
+            }
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            captureButton.disabled = true;
+            describeButton.disabled = true;
+            lastCapturedFilePuterPath = null;
+            hideSpinner();
+            aiResponseDiv.textContent = '';
+        }
+
+        async function changeCamera() {
+            currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
+            await startWebcam(); // Restart webcam with the next device
+        }
+
+        // --- Capture and AI Description Logic ---
+        async function capturePhoto() {
+            if (!currentStream) {
+                statusMessage.textContent = 'Webcam not started. Please start webcam first.';
+                return;
+            }
+
+            captureButton.disabled = true;
+            describeButton.disabled = true;
+            stopButton.disabled = true; // Disable stop during capture
+            startButton.disabled = true; // Disable start during capture
+            changeCameraButton.disabled = true; // Disable camera change
+
+            statusMessage.textContent = 'Capturing image...';
+            hideSpinner(); // Clear previous AI results
+            aiResponseDiv.textContent = '';
+            lastCapturedFilePuterPath = null; // Reset path for new capture
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(async (blob) => {
+                if (blob) {
+                    try {
+                        const filename = `webcam_snapshot_${Date.now()}.png`;
+                        const puterFile = await puter.fs.write(filename, blob);
+                        lastCapturedFilePuterPath = puterFile.path;
+                        
+                        statusMessage.innerHTML = `✅ Photo captured and saved to Puter: <code>${puterFile.path}</code>. Ready for description.`;
+                        describeButton.disabled = false; // Enable describe button
+                        
+                    } catch (error) {
+                        console.error('Error saving photo to Puter:', error);
+                        statusMessage.textContent = 'Error saving photo: ' + error.message;
+                    }
+                } else {
+                    statusMessage.textContent = 'Failed to create image blob from canvas.';
+                }
+                captureButton.disabled = false;
+                stopButton.disabled = false;
+                // startButton remains disabled until stop webcam
+                changeCameraButton.disabled = false;
+            }, 'image/png');
+        }
+
+        async function describePhotoWithAI() {
+            if (!lastCapturedFilePuterPath) {
+                statusMessage.textContent = 'No photo has been captured yet to describe.';
+                return;
+            }
+
+            describeButton.disabled = true;
+            captureButton.disabled = true; // Disable capture during AI processing
+            startButton.disabled = true;
+            stopButton.disabled = true;
+            changeCameraButton.disabled = true;
+
+            statusMessage.textContent = 'Sending photo to AI for description...';
+            showSpinner('AI is analyzing the image...');
+
+            try {
+                const prompt = 'Please describe this image in detail, providing key objects, actions, and overall context.';
+                // puter.ai.chat expects a Puter path or URL for image context
+                const aiResponse = await puter.ai.chat(
+                    prompt, 
+                    lastCapturedFilePuterPath,
+                    { stream: true } // Stream the response for better user experience
+                );
+
+                aiResponseDiv.textContent = ''; // Clear spinner content
+                for await (const part of aiResponse) {
+                    if (part?.text) {
+                        aiResponseDiv.textContent += part.text;
+                        aiResponseDiv.scrollTop = aiResponseDiv.scrollHeight; // Scroll to bottom as content arrives
+                    }
+                }
+                statusMessage.textContent = 'AI description complete.';
+
+                // Optional: Clean up the temporary file after AI description
+                await puter.fs.delete(lastCapturedFilePuterPath);
+                statusMessage.innerHTML += '<br>Temporary file deleted from Puter. (Path: ' + lastCapturedFilePuterPath + ')';
+                lastCapturedFilePuterPath = null; // Clear path after deletion
+
+            } catch (error) {
+                console.error('Error describing image with AI:', error);
+                aiResponseDiv.textContent = 'Error getting AI description: ' + error.message;
+                statusMessage.textContent = 'AI description failed.';
+            } finally {
+                hideSpinner();
+                describeButton.disabled = false;
+                captureButton.disabled = false;
+                startButton.disabled = true; // Still disabled if stream is active
+                stopButton.disabled = false;
+                changeCameraButton.disabled = false;
+            }
+        }
+
+        // --- App Lifecycle and Event Listeners ---
+        // Initialize by checking login status on page load
+        updateLoginUI();
+
+        // Event Listeners
+        loginLogoutButton.addEventListener('click', handleLoginLogout);
+        settingsButton.addEventListener('click', showSettings);
+        startButton.addEventListener('click', startWebcam);
+        stopButton.addEventListener('click', stopWebcam);
+        captureButton.addEventListener('click', capturePhoto);
+        describeButton.addEventListener('click', describePhotoWithAI);
+        changeCameraButton.addEventListener('click', changeCamera);
+
+        // Cleanup webcam stream when the app window closes
+        puter.ui.onWindowClose(function() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                console.log("Webcam stream stopped on app close.");
+            }
+            // If there's a temporary file, try to delete it on close
+            if (lastCapturedFilePuterPath) {
+                puter.fs.delete(lastCapturedFilePuterPath)
+                    .then(() => console.log("Cleaned up temporary file on app close."))
+                    .catch(e => console.error("Error cleaning up temporary file on app close:", e));
+            }
+        });
+    </script>
+</body>
+
+</html>
